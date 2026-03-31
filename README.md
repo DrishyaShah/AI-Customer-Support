@@ -1,4 +1,4 @@
-# Customer Support Copilot — Atlan Assignment
+# Customer Support Copilot
 
 ## Overview
 This project implements a **Customer Support Copilot** to streamline support operations using:
