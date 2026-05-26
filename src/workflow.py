@@ -15,9 +15,8 @@ import uuid
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
-from langchain.schema import Document
 from langchain.prompts import PromptTemplate
-from langchain.chains import RetrievalQA 
+from langchain.chains import RetrievalQA
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.documents import Document
 
@@ -37,12 +36,6 @@ from src.ticketing import create_ticket as ticketing_create_ticket
 
 # If your project exposes a top-level llm instance (used by RetrievalQA) you can import it:
 from src.llm import llm as llm_instance
-
-# Optional: import Document type for typing convenience (if available in your langchain variant)
-try:
-    from langchain_core.documents import Document  # type: ignore
-except Exception:
-    Document = dict  # fallback typing
 
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.NullHandler())
@@ -204,7 +197,8 @@ Your role is to help users by answering questions clearly, accurately,
 and in a friendly manner using the provided documentation.
 Guidelines:
 - Use ONLY the provided context to answer. Do not invent features or details not present in the context.
-- If the answer is not in the context, politely say you don’t know and suggest contacting Atlan support.
+- If the answer is not in the context, politely say you don’t know.
+- Only suggest contacting Atlan Support if the answer has not been answered sufficiently. 
 - Give answers in a helpful, step-by-step format when explaining workflows.
 - Keep the tone professional, approachable, and concise.
 
@@ -231,18 +225,22 @@ Answer:"""
         docs = result.get("source_documents", [])
 
         escalation_prompt = f"""
-You are an Atlan support supervisor AI. Review the assistant's answer and decide if it should be escalated.
+You are an Atlan support supervisor AI. Review the assistant's answer and decide if escalation is needed. 
+Return only True or False.
 
 Answer:
 {answer_text}
 
-Escalate (True) if:
-- Documentation is missing.
-- The answer says to contact Atlan support.
-- The question is unclear or out of scope.
-- The problem is not fully solved.
+Escalate (True) only if:
+- The assistant explicitly says documentation is missing or unavailable.
+- The assistant instructs the user to contact Atlan support directly.
+- The answer is clearly irrelevant, off-topic, or refuses to answer.
+- The answer admits uncertainty (e.g., "I am not sure", "I don't know").
 
-Do NOT escalate (False) if the answer is clear, complete, and actionable.
+Do NOT escalate (False) if:
+- The answer provides clear, correct, and actionable steps.
+- The question is fully addressed, even if briefly.
+- The answer cites relevant documentation or gives a resolution.
 """
         escalation_result = safe_invoke_structured(escalation_llm, escalation_prompt)
 
