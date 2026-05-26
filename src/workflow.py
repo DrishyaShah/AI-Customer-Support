@@ -11,7 +11,6 @@ This file defines:
 
 from typing import TypedDict, List, Optional, Any, Dict
 import logging
-import uuid
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
@@ -24,7 +23,6 @@ from langchain_core.documents import Document
 from src.schemas import TopicSchema, SentimentSchema, PrioritySchema
 from src.llm import (
     safe_invoke_structured,
-    safe_invoke_text,
     topic_llm,
     sentiment_llm,
     priority_llm,
