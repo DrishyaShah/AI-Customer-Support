@@ -16,7 +16,8 @@ import uuid
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langchain_core.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.documents import Document
 
 # Local modules
@@ -28,12 +29,10 @@ from src.llm import (
     sentiment_llm,
     priority_llm,
     escalation_llm,
-    # llm is available inside safe_invoke_text results when needed by RetrievalQA creation
 )
 from src.retriever import retriever
 from src.ticketing import create_ticket as ticketing_create_ticket
 
-# If your project exposes a top-level llm instance (used by RetrievalQA) you can import it:
 from src.llm import llm as llm_instance
 
 logger = logging.getLogger(__name__)
@@ -191,13 +190,13 @@ def generate_answer(state: AgentState) -> AgentState:
     if not message:
         return {"answer": "No message provided."}
 
-    template = """You are an Atlan customer support assistant. 
-Your role is to help users by answering questions clearly, accurately, 
+    template = """You are an Atlan customer support assistant.
+Your role is to help users by answering questions clearly, accurately,
 and in a friendly manner using the provided documentation.
 Guidelines:
 - Use ONLY the provided context to answer. Do not invent features or details not present in the context.
 - If the answer is not in the context, politely say you don’t know.
-- Only suggest contacting Atlan Support if the answer has not been answered sufficiently. 
+- Only suggest contacting Atlan Support if the answer has not been answered sufficiently.
 - Give answers in a helpful, step-by-step format when explaining workflows.
 - Keep the tone professional, approachable, and concise.
 
@@ -205,23 +204,18 @@ Context:
 {context}
 
 Question:
-{question}
+{input}
 
 Answer:"""
-    prompt = PromptTemplate(template=template, input_variables=[ "question", "context"])
+    prompt = PromptTemplate(template=template, input_variables=["input", "context"])
 
     try:
-        # New style: build doc chain
-        qa = RetrievalQA.from_chain_type(llm=llm_instance, 
-        retriever=retriever, 
-        chain_type="stuff",
-        return_source_documents=True, 
-        chain_type_kwargs={"prompt": prompt}, 
-        )
+        combine_docs_chain = create_stuff_documents_chain(llm_instance, prompt)
+        qa = create_retrieval_chain(retriever, combine_docs_chain)
 
-        result = qa({"query":message})
-        answer_text = result.get("result", "")
-        docs = result.get("source_documents", [])
+        result = qa.invoke({"input": message})
+        answer_text = result.get("answer", "")
+        docs = result.get("context", [])
 
         escalation_prompt = f"""
 You are an Atlan support supervisor AI. Review the assistant's answer and decide if escalation is needed. 
